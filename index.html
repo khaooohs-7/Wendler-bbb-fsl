@@ -3,6 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#d9372b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Wendler">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <title>Wendler 5/3/1 Forever – Trainer</title>
 <style>
 :root{--bg:#f6f4f1;--card:#fff;--ink:#1c1b1a;--mut:#6b6762;--line:#e3dfd9;--acc:#d9372b;--accink:#fff;--ok:#2e7d4f;--warn:#b26a00}
@@ -96,6 +103,14 @@ const ACC_A={
  dl:['Latzug 5x10','Bizeps-Curl 3x12','Dips 5x10','Toes-to-Bar 3x10'],
  oh:['Klimmzüge 5x8','Kabelrudern 3x12','Cable Chest Fly 4x12-15','GHD Side Crunch 3x12','Reverse Hyper 5x10']};
 const ACC_D=['Toes-to-Bar 2x8-12','Kabelrudern 2x12'];
+const POOL=['Latzug','Kabelrudern','Seal Row','Klimmzüge','Dips','Seitheben (Kabel)','Shrugs','Bizeps-Curl','Trizeps-Pushdown','Cable Chest Fly','Toes-to-Bar','GHD Side Crunch','Reverse Hyper'];
+function accFor(S,kind,lift){
+  const c=S.accCfg;
+  if(kind==='D')return (c&&c.D)||ACC_D;
+  const t=c&&c[kind]&&c[kind][lift];
+  return t||(kind==='L'?ACC_L[lift]:ACC_A[lift]);
+}
+function cloneAcc(){const o={L:{},A:{},D:ACC_D.slice()};LIFTS.forEach(l=>{o.L[l]=ACC_L[l].slice();o.A[l]=ACC_A[l].slice();});return o;}
 
 const rnd=(x,r)=>Math.round(x/(r||2.5))*(r||2.5);
 const r1=x=>Math.round(x*10)/10;
@@ -108,7 +123,7 @@ function defState(){
   const e1rm={sq:115,bp:97,dl:160,oh:55.5};
   const tm={};LIFTS.forEach(l=>tm[l]=rnd(e1rm[l]*cfg.tmPct,cfg.round));
   return {v:2,cfg,e1rm,tm,block:1,stage:0,week:1,day:0,pending:null,
-    fails:{sq:0,bp:0,dl:0,oh:0},stageFail:{},deloadFail:{},pr:{},cur:null,history:[],days:{},lastW:{},blockLog:[],notice:[],_t:0};
+    fails:{sq:0,bp:0,dl:0,oh:0},stageFail:{},deloadFail:{},pr:{},cur:null,history:[],days:{},lastW:{},accCfg:null,blockLog:[],notice:[],_t:0};
 }
 
 function plan(S){
@@ -119,15 +134,15 @@ function plan(S){
     main=LW[S.week-1].map(p=>({w:rnd(tm*p,R),r:5,min:5,pr:false}));
     const bl=BBBLIFT[lift];
     extra={name:'BBB '+NAME[bl],sets:5,reps:10,w:rnd(S.tm[bl]*S.cfg.bbb[bl],R),pct:S.cfg.bbb[bl]};
-    acc=ACC_L[lift];
+    acc=accFor(S,'L',lift);
   }else if(st.kind==='A'){
     const a=AW[S.week-1];
     main=a.p.map((p,i)=>({w:rnd(tm*p,R),r:a.r[i],min:a.r[i],pr:i===2&&a.pr>0}));
     extra={name:'FSL '+NAME[lift],sets:5,reps:5,w:main[0].w,pct:a.p[0]};
-    acc=ACC_A[lift];
+    acc=accFor(S,'A',lift);
   }else{
     main=[[.7,5],[.8,3],[.9,1],[1,1]].map(a=>({w:rnd(tm*a[0],R),r:a[1],min:a[1],pr:false,test:a[0]===1}));
-    acc=ACC_D;
+    acc=accFor(S,'D',lift);
   }
   return {st,lift,tm,warm,main,extra,acc:acc.map(parseAcc)};
 }
@@ -138,6 +153,11 @@ function ensureCur(S){
   S.cur={main:p.main.map(m=>({reps:m.r,done:false})),warm:p.warm.map(()=>false),
     extra:p.extra?Array(p.extra.sets).fill(false):[],
     acc:p.acc.map(a=>({d:Array(a.sets).fill(false),r:Array(a.sets).fill(defReps(a.reps)),w:(S.lastW&&S.lastW[a.name])||''}))};
+}
+function rebuildAcc(S){
+  if(!S.cur)return;
+  const p=plan(S);
+  S.cur.acc=p.acc.map(a=>({d:Array(a.sets).fill(false),r:Array(a.sets).fill(defReps(a.reps)),w:(S.lastW&&S.lastW[a.name])||''}));
 }
 function defReps(s){const m=/(\d+)\s*$/.exec(String(s||''));return m?parseInt(m[1],10):0;}
 const BW=['Dips','Klimmzüge','Toes-to-Bar','GHD Side Crunch','Reverse Hyper'];
@@ -240,7 +260,7 @@ function applyRemote(d){
   try{
     S=normalize(JSON.parse(d.json));S._t=d.t||S._t||0;lsSave();
     const ae=document.activeElement;
-    if(TAB!=='einst'&&TAB!=='test'&&!(ae&&ae.tagName==='INPUT'))render();else paintSub();
+    if(TAB!=='einst'&&TAB!=='test'&&TAB!=='acc'&&!(ae&&ae.tagName==='INPUT'))render();else paintSub();
   }catch(e){}
 }
 async function boot(){
@@ -407,7 +427,7 @@ function viewKal(){
 }
 function viewEinst(){
   const c=S.cfg;
-  let h='<div class="card"><h2>Konto</h2><div class="mut">'+(UID?'Angemeldet'+(UNAME?' als <b>'+UNAME+'</b>':'')+'. Dein Stand liegt privat in deinem Konto und ist auf jedem Gerät verfügbar, auf dem du dich mit demselben Konto anmeldest. Andere Personen (z. B. Leo) haben eigene, getrennte Daten, wenn sie sich mit ihrem Konto anmelden und ihnen die Seite freigegeben ist.':'Nicht angemeldet. Der Stand bleibt nur auf diesem Gerät. Öffne die Seite in der angemeldeten Claude-App, damit er synchronisiert wird.')+'</div></div>';
+  let h='<div class="card"><button class="btn" onclick="setTab(\'acc\')">Zubehör bearbeiten</button></div><div class="card"><h2>Konto</h2><div class="mut">'+(UID?'Angemeldet'+(UNAME?' als <b>'+UNAME+'</b>':'')+'. Dein Stand liegt privat in deinem Konto und ist auf jedem Gerät verfügbar, auf dem du dich mit demselben Konto anmeldest. Andere Personen (z. B. Leo) haben eigene, getrennte Daten, wenn sie sich mit ihrem Konto anmelden und ihnen die Seite freigegeben ist.':'Nicht angemeldet. Der Stand bleibt nur auf diesem Gerät. Öffne die Seite in der angemeldeten Claude-App, damit er synchronisiert wird.')+'</div></div>';
   h+='<div class="card"><h2>Pausenzeiten (Sekunden)</h2><div class="grid"><div><label>Hauptsatz</label><input id="r_main" type="number" value="'+c.rest.main+'"></div><div><label>BBB / FSL</label><input id="r_extra" type="number" value="'+c.rest.extra+'"></div><div><label>Zubehör</label><input id="r_acc" type="number" value="'+c.rest.acc+'"></div></div><button class="btn" style="margin-top:10px" onclick="saveEinst()">Speichern</button></div>';
   h+='<div class="card"><h2>1RM und TM</h2><div class="grid">';
   LIFTS.forEach(l=>{h+='<div><label>'+NAME[l]+' 1RM (kg)</label><input id="e_'+l+'" type="number" step="0.5" value="'+S.e1rm[l]+'"></div><div><label>'+NAME[l]+' TM (kg)</label><input id="t_'+l+'" type="number" step="0.5" value="'+S.tm[l]+'"></div>';});
@@ -460,10 +480,50 @@ function applyTest(){
   S.notice=['Neustart mit neuen Startwerten: '+ks.map(l=>NAME[l]+' TM '+fmt(S.tm[l])+' kg').join(', ')];
   save();TAB='heute';render();window.scrollTo(0,0);
 }
+let EDIT={kind:'L',lift:'sq'};
+function accList(){S.accCfg=S.accCfg||cloneAcc();return EDIT.kind==='D'?S.accCfg.D:S.accCfg[EDIT.kind][EDIT.lift];}
+function viewAcc(){
+  const kinds=[['L','Leader'],['A','Anchor'],['D','Deload']];
+  const list=accFor(S,EDIT.kind,EDIT.lift);
+  let h='<div class="card"><h2>Zubehör bearbeiten</h2><div class="mut">Gilt für alle künftigen Einheiten dieser Phase und dieses Tages. Läuft gerade eine Einheit, wird nur ihr Zubehör-Teil neu aufgebaut.</div>'
+    +'<div class="chips" style="margin-top:10px">'+kinds.map(k=>'<button class="chip'+(EDIT.kind===k[0]?' on':'')+'" onclick="accKind(\''+k[0]+'\')">'+k[1]+'</button>').join('')+'</div>';
+  if(EDIT.kind!=='D')h+='<div class="chips" style="margin-top:8px">'+LIFTS.map(l=>'<button class="chip'+(EDIT.lift===l?' on':'')+'" onclick="accLift(\''+l+'\')">'+NAME[l]+'-Tag</button>').join('')+'</div>';
+  h+='</div><div class="card">';
+  list.forEach((s,i)=>{
+    const a=parseAcc(s);
+    h+='<div style="padding:8px 0;border-top:'+(i?'1px solid var(--line)':'0')+'"><label style="margin-top:0">Übung</label><input type="text" value="'+a.name.replace(/"/g,'&quot;')+'" onchange="accSet('+i+',\'n\',this.value)">'
+      +'<div class="grid"><div><label>Sätze</label><input type="number" inputmode="numeric" value="'+a.sets+'" onchange="accSet('+i+',\'s\',this.value)"></div><div><label>Wiederholungen</label><input type="text" value="'+a.reps+'" onchange="accSet('+i+',\'r\',this.value)"></div></div>'
+      +'<div class="chips" style="margin-top:8px"><button class="chip" onclick="accMove('+i+',-1)">↑</button><button class="chip" onclick="accMove('+i+',1)">↓</button><button class="chip" onclick="accDel('+i+')">Entfernen</button></div></div>';
+  });
+  if(!list.length)h+='<div class="mut">Keine Übungen.</div>';
+  h+='</div><div class="card"><h2>Übung hinzufügen</h2><input id="newn" list="pool" placeholder="Name wählen oder eintippen"><datalist id="pool">'+POOL.map(p=>'<option value="'+p+'">').join('')+'</datalist>'
+    +'<button class="btn" style="margin-top:8px" onclick="accAdd()">Hinzufügen (3 × 10)</button>'
+    +'<button class="btn sec" onclick="accReset()">Diese Liste auf Standard zurücksetzen</button><button class="btn sec" onclick="setTab(\'einst\')">Fertig</button></div>';
+  return h;
+}
+function accTouch(re){save();if(re)render();}
+function accKind(k){EDIT.kind=k;render();}
+function accLift(l){EDIT.lift=l;render();}
+function accSet(i,f,v){
+  const l=accList(),a=parseAcc(l[i]);
+  if(f==='n'){const n=String(v).trim();if(n)a.name=n;}
+  if(f==='s'){const s=parseInt(v,10);if(s>0&&s<=10)a.sets=s;}
+  if(f==='r'){const r=String(v).trim();if(/^\d+(-\d+)?$/.test(r))a.reps=r;}
+  l[i]=a.name+' '+a.sets+'x'+(a.reps||'10');
+  rebuildAcc(S);accTouch(true);
+}
+function accMove(i,d){const l=accList(),j=i+d;if(j<0||j>=l.length)return;const t=l[i];l[i]=l[j];l[j]=t;rebuildAcc(S);accTouch(true);}
+function accDel(i){accList().splice(i,1);rebuildAcc(S);accTouch(true);}
+function accAdd(){const n=String($('newn').value).trim();if(!n)return;accList().push(n+' 3x10');rebuildAcc(S);accTouch(true);}
+function accReset(){
+  const l=accList();
+  const d=EDIT.kind==='D'?ACC_D:(EDIT.kind==='L'?ACC_L[EDIT.lift]:ACC_A[EDIT.lift]);
+  l.length=0;d.forEach(x=>l.push(x));rebuildAcc(S);accTouch(true);
+}
 function render(){
   paintSub();
-  $('app').innerHTML=TAB==='heute'?viewHeute():TAB==='plan'?viewPlan():TAB==='kal'?viewKal():TAB==='test'?viewTest():viewEinst();
-  $('nav').innerHTML=[['heute','Heute'],['plan','Plan'],['kal','Kalender'],['test','1RM-Test'],['einst','Einstellungen']].map(t=>'<button class="'+(TAB===t[0]?'on':'')+'" onclick="setTab(\''+t[0]+'\')">'+t[1]+'</button>').join('');
+  $('app').innerHTML=TAB==='heute'?viewHeute():TAB==='plan'?viewPlan():TAB==='kal'?viewKal():TAB==='test'?viewTest():TAB==='acc'?viewAcc():viewEinst();
+  $('nav').innerHTML=[['heute','Heute'],['plan','Plan'],['kal','Kalender'],['test','1RM-Test'],['einst','Mehr']].map(t=>'<button class="'+((TAB===t[0]||(t[0]==='einst'&&TAB==='acc'))?'on':'')+'" onclick="setTab(\''+t[0]+'\')">'+t[1]+'</button>').join('');
 }
 /* Handler */
 function tw(i){S.cur.warm[i]=!S.cur.warm[i];save();render();}
@@ -507,6 +567,9 @@ function doExport(){$('ex').value=JSON.stringify(S);try{$('ex').select();navigat
 function doImport(){try{const x=JSON.parse($('ex').value);S=normalize(x);S.cur=null;save();TAB='heute';render();}catch(e){$('ex').value='Ungültiges JSON';}}
 function doReset(){if(S._confirm){S=defState();save();TAB='heute';render();}else{S._confirm=true;$('ex').value='Nochmal tippen zum endgültigen Zurücksetzen.';setTimeout(()=>{delete S._confirm;},4000);}}
 boot();
+</script>
+<script>
+try{if('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && !/claude\.(ai|site)|claudeusercontent/.test(location.hostname)){window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(){});});}}catch(e){}
 </script>
 </body>
 </html>

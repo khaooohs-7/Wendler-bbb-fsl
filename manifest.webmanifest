@@ -1,0 +1,17 @@
+{
+  "name": "Wendler 5/3/1 Forever – Trainer",
+  "short_name": "Wendler",
+  "description": "Trainingsplan, Satztracker und Pause-Timer für 5/3/1 Forever",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#161514",
+  "theme_color": "#d9372b",
+  "lang": "de",
+  "icons": [
+    {"src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+    {"src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
+    {"src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+  ]
+}
