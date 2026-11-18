@@ -126,8 +126,9 @@ function defState(){
     fails:{sq:0,bp:0,dl:0,oh:0},stageFail:{},deloadFail:{},pr:{},cur:null,history:[],days:{},lastW:{},accCfg:null,blockLog:[],notice:[],_t:0};
 }
 
+function ord(S){const o=S&&S.cfg&&S.cfg.order;return Array.isArray(o)&&o.length===4&&LIFTS.every(l=>o.indexOf(l)>=0)?o:LIFTS;}
 function plan(S){
-  const st=STAGES[S.stage],lift=LIFTS[S.day],tm=S.tm[lift],R=S.cfg.round;
+  const st=STAGES[S.stage],lift=ord(S)[S.day],tm=S.tm[lift],R=S.cfg.round;
   const warm=[[.4,5],[.5,5],[.6,3]].map(a=>({w:rnd(tm*a[0],R),r:a[1]}));
   let main=[],extra=null,acc=[];
   if(st.kind==='L'){
@@ -330,13 +331,13 @@ function viewHeute(){
   const p=plan(S),st=p.st,c=S.cur;
   let h='';
   if(S.notice&&S.notice.length)h+='<div class="note">'+S.notice.map(n=>'• '+n).join('<br>')+'</div>';
-  const next=LIFTS[(S.day+1)%4];
+  const next=ord(S)[(S.day+1)%4];
   h+='<div class="card"><h2>Heute</h2><div style="font-size:22px;font-weight:700">'+NAME[p.lift]+'</div>'
     +'<div class="mut">'+st.name+' · Woche '+S.week+' · Einheit '+(S.day+1)+'/4 · TM '+fmt(p.tm)+' kg</div>'+progBar()+'</div>';
   h+='<div class="card"><h2>Pause-Timer</h2><div class="chips">'
     +[60,90,120,180,240].map(s=>'<button class="chip" onclick="startTimer('+s+')">'+(s>=120&&s%60===0?(s/60)+' min':s+' s')+'</button>').join('')
     +'</div><div class="grid" style="margin-top:8px"><input id="ct" type="number" inputmode="numeric" placeholder="Sekunden"><button class="btn sec" onclick="customTimer()">Start</button></div>'
-    +'<div class="row" style="margin-top:6px"><div class="lab"><b style="font-size:15px">Auto-Pause nach Satz</b><small>Haupt '+S.cfg.rest.main+' s · Zusatz '+S.cfg.rest.extra+' s · Zubehör '+S.cfg.rest.acc+' s</small></div>'
+    +'<div class="row" style="margin-top:6px"><div class="lab"><b style="font-size:15px">Auto-Pause nach Satz</b><small>Haupt '+S.cfg.rest.main+' s · Zusatz '+S.cfg.rest.extra+' s · Assistenzübungen '+S.cfg.rest.acc+' s</small></div>'
     +'<button class="chip'+(S.cfg.rest.auto?' on':'')+'" onclick="toggleAuto()">'+(S.cfg.rest.auto?'an':'aus')+'</button></div></div>';
   h+='<div class="card"><h2>Aufwärmen</h2>'+p.warm.map((w,i)=>
     '<div class="row"><button class="chk'+(c.warm[i]?' on':'')+'" onclick="tw('+i+')">'+(c.warm[i]?'✓':'')+'</button><div class="lab"><b>'+fmt(w.w)+' kg</b> × '+w.r+'</div></div>').join('')+'</div>';
@@ -351,7 +352,7 @@ function viewHeute(){
   if(p.extra){
     h+='<div class="card"><h2>'+p.extra.name+'</h2><div><b>'+p.extra.sets+' × '+p.extra.reps+' @ '+fmt(p.extra.w)+' kg</b> <span class="mut">('+Math.round(p.extra.pct*100)+' %)</span></div>'+dots(p.extra.sets,c.extra,'tx')+'</div>';
   }
-  h+='<div class="card"><h2>Zubehör</h2>';
+  h+='<div class="card"><h2>Assistenzübungen</h2>';
   p.acc.forEach((a,i)=>{
     const ca=c.acc[i];
     const bw=BW.indexOf(a.name)>=0;
@@ -398,7 +399,7 @@ function viewPlan(){
 const MON=['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
 function entryRow(e){
   return '<div class="row"><div class="lab"><b>'+NAME[e.lift]+'</b> '+(e.failed?'<span class="tag">verfehlt</span>':'')+'<small>B'+e.block+' '+e.stage+' W'+e.week+' · TM '+fmt(e.tm)+'</small>'
-    +'<small>'+e.sets.map(s=>fmt(s.w)+'×'+s.r).join(' · ')+' · Zusatz '+e.extra+' · Zubehör '+e.acc+'</small>'
+    +'<small>'+e.sets.map(s=>fmt(s.w)+'×'+s.r).join(' · ')+' · Zusatz '+e.extra+' · Assistenzübungen '+e.acc+'</small>'
     +(e.accs||[]).map(a=>'<small>'+a.n+': '+a.r.join(' / ')+' Wdh.'+(a.w?' · '+(BW.indexOf(a.n)>=0?'+':'')+fmt(a.w)+' kg':'')+'</small>').join('')+'</div></div>';
 }
 function viewKal(){
@@ -427,8 +428,8 @@ function viewKal(){
 }
 function viewEinst(){
   const c=S.cfg;
-  let h='<div class="card"><button class="btn" onclick="setTab(\'acc\')">Zubehör bearbeiten</button></div><div class="card"><h2>Konto</h2><div class="mut">'+(UID?'Angemeldet'+(UNAME?' als <b>'+UNAME+'</b>':'')+'. Dein Stand liegt privat in deinem Konto und ist auf jedem Gerät verfügbar, auf dem du dich mit demselben Konto anmeldest. Andere Personen (z. B. Leo) haben eigene, getrennte Daten, wenn sie sich mit ihrem Konto anmelden und ihnen die Seite freigegeben ist.':'Nicht angemeldet. Der Stand bleibt nur auf diesem Gerät. Öffne die Seite in der angemeldeten Claude-App, damit er synchronisiert wird.')+'</div></div>';
-  h+='<div class="card"><h2>Pausenzeiten (Sekunden)</h2><div class="grid"><div><label>Hauptsatz</label><input id="r_main" type="number" value="'+c.rest.main+'"></div><div><label>BBB / FSL</label><input id="r_extra" type="number" value="'+c.rest.extra+'"></div><div><label>Zubehör</label><input id="r_acc" type="number" value="'+c.rest.acc+'"></div></div><button class="btn" style="margin-top:10px" onclick="saveEinst()">Speichern</button></div>';
+  let h='<div class="card"><button class="btn" onclick="setTab(\'acc\')">Assistenzübungen bearbeiten</button></div><div class="card"><h2>Konto</h2><div class="mut">'+(UID?'Angemeldet'+(UNAME?' als <b>'+UNAME+'</b>':'')+'. Dein Stand liegt privat in deinem Konto und ist auf jedem Gerät verfügbar, auf dem du dich mit demselben Konto anmeldest. Andere Personen (z. B. Leo) haben eigene, getrennte Daten, wenn sie sich mit ihrem Konto anmelden und ihnen die Seite freigegeben ist.':'Nicht angemeldet. Der Stand bleibt nur auf diesem Gerät. Öffne die Seite in der angemeldeten Claude-App, damit er synchronisiert wird.')+'</div></div>';
+  h+='<div class="card"><h2>Pausenzeiten (Sekunden)</h2><div class="grid"><div><label>Hauptsatz</label><input id="r_main" type="number" value="'+c.rest.main+'"></div><div><label>BBB / FSL</label><input id="r_extra" type="number" value="'+c.rest.extra+'"></div><div><label>Assistenzübungen</label><input id="r_acc" type="number" value="'+c.rest.acc+'"></div></div><button class="btn" style="margin-top:10px" onclick="saveEinst()">Speichern</button></div>';
   h+='<div class="card"><h2>1RM und TM</h2><div class="grid">';
   LIFTS.forEach(l=>{h+='<div><label>'+NAME[l]+' 1RM (kg)</label><input id="e_'+l+'" type="number" step="0.5" value="'+S.e1rm[l]+'"></div><div><label>'+NAME[l]+' TM (kg)</label><input id="t_'+l+'" type="number" step="0.5" value="'+S.tm[l]+'"></div>';});
   h+='</div><label>TM-Prozent vom 1RM (z. B. 0,9)</label><input id="tmpct" type="number" step="0.01" value="'+c.tmPct+'">'
@@ -437,6 +438,7 @@ function viewEinst(){
   h+='<div class="card"><h2>BBB-Prozent und Steigerung</h2><div class="grid">';
   LIFTS.forEach(l=>{h+='<div><label>BBB '+NAME[l]+' (0,5–0,65)</label><input id="b_'+l+'" type="number" step="0.01" value="'+c.bbb[l]+'"></div><div><label>Steigerung '+NAME[l]+' (kg)</label><input id="s_'+l+'" type="number" step="0.5" value="'+c.step[l]+'"></div>';});
   h+='</div><button class="btn" style="margin-top:10px" onclick="saveEinst()">Speichern</button></div>';
+  h+='<div class="card"><h2>Reihenfolge der Einheiten</h2><div class="mut">Welche Übung an welchem Trainingstag drankommt (1 = erster Tag, dann 2, 3, 4 und wieder von vorn).</div>'+ord(S).map((l,i)=>'<div class="row"><div class="lab"><b>'+(i+1)+'. '+NAME[l]+'</b></div><button class="btn sec" style="width:auto;margin:0 4px" onclick="setOrder('+i+',-1)">↑</button><button class="btn sec" style="width:auto;margin:0" onclick="setOrder('+i+',1)">↓</button></div>').join('')+'</div>';
   h+='<div class="card"><h2>Position setzen</h2><div class="grid"><div><label>Phase</label><select id="p_stage">'+STAGES.map((s,i)=>'<option value="'+i+'"'+(i===S.stage?' selected':'')+'>'+s.name+'</option>').join('')+'</select></div>'
     +'<div><label>Woche</label><select id="p_week">'+[1,2,3].map(w=>'<option'+(w===S.week?' selected':'')+'>'+w+'</option>').join('')+'</select></div>'
     +'<div><label>Einheit</label><select id="p_day">'+LIFTS.map((l,i)=>'<option value="'+i+'"'+(i===S.day?' selected':'')+'>'+NAME[l]+'</option>').join('')+'</select></div>'
@@ -485,7 +487,7 @@ function accList(){S.accCfg=S.accCfg||cloneAcc();return EDIT.kind==='D'?S.accCfg
 function viewAcc(){
   const kinds=[['L','Leader'],['A','Anchor'],['D','Deload']];
   const list=accFor(S,EDIT.kind,EDIT.lift);
-  let h='<div class="card"><h2>Zubehör bearbeiten</h2><div class="mut">Gilt für alle künftigen Einheiten dieser Phase und dieses Tages. Läuft gerade eine Einheit, wird nur ihr Zubehör-Teil neu aufgebaut.</div>'
+  let h='<div class="card"><h2>Assistenzübungen bearbeiten</h2><div class="mut">Gilt für alle künftigen Einheiten dieser Phase und dieses Tages. Läuft gerade eine Einheit, wird nur ihr Assistenz-Teil neu aufgebaut.</div>'
     +'<div class="chips" style="margin-top:10px">'+kinds.map(k=>'<button class="chip'+(EDIT.kind===k[0]?' on':'')+'" onclick="accKind(\''+k[0]+'\')">'+k[1]+'</button>').join('')+'</div>';
   if(EDIT.kind!=='D')h+='<div class="chips" style="margin-top:8px">'+LIFTS.map(l=>'<button class="chip'+(EDIT.lift===l?' on':'')+'" onclick="accLift(\''+l+'\')">'+NAME[l]+'-Tag</button>').join('')+'</div>';
   h+='</div><div class="card">';
@@ -555,6 +557,13 @@ function recalcTm(){
   saveEinst();
   LIFTS.forEach(l=>S.tm[l]=rnd(S.e1rm[l]*S.cfg.tmPct,S.cfg.round));
   S.cur=null;save();render();
+}
+function setOrder(i,d){
+  const o=ord(S).slice(),j=i+d;if(j<0||j>=4)return;
+  const before=o[S.day];const t=o[i];o[i]=o[j];o[j]=t;
+  S.cfg.order=o;
+  if(o[S.day]!==before)S.cur=null;
+  save();render();
 }
 function savePos(){
   S.stage=parseInt($('p_stage').value,10);
