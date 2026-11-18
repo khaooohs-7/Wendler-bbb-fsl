@@ -161,7 +161,7 @@ function rebuildAcc(S){
   S.cur.acc=p.acc.map(a=>({d:Array(a.sets).fill(false),r:Array(a.sets).fill(defReps(a.reps)),w:(S.lastW&&S.lastW[a.name])||''}));
 }
 function defReps(s){const m=/(\d+)\s*$/.exec(String(s||''));return m?parseInt(m[1],10):0;}
-const BW=['Dips','Klimmzüge','Toes-to-Bar','GHD Side Crunch','Reverse Hyper'];
+const BW=['Dips','Klimmzüge','Toes-to-Bar','GHD Side Crunch'];
 
 function endStage(S){
   const st=STAGES[S.stage],notes=[];
@@ -376,8 +376,29 @@ function progBar(){
     h+='<div class="'+(done?'done':cur?'cur':'')+'" title="'+s.name+' W'+w+'"></div>';}});
   return h+'</div>';
 }
+let PV=null;
+function setPV(k,v){PV[k]=parseInt(v,10);if(k==='stage'||k==='week')PV.week=Math.min(PV.week,STAGES[PV.stage].weeks);render();}
+function editFromPV(){EDIT={kind:STAGES[PV.stage].kind,lift:ord(S)[PV.day]};setTab('acc');}
+function viewVorschau(){
+  if(!PV)PV={stage:S.stage,week:S.week,day:S.day};
+  PV.week=Math.min(PV.week,STAGES[PV.stage].weeks);
+  const P=plan(Object.assign({},S,{stage:PV.stage,week:PV.week,day:PV.day,cur:null}));
+  const sel=(id,opts,cur)=>'<select onchange="setPV(\''+id+'\',this.value)">'+opts.map(o=>'<option value="'+o[0]+'"'+(o[0]===cur?' selected':'')+'>'+o[1]+'</option>').join('')+'</select>';
+  let h='<div class="card"><h2>Vorschau (ohne Start)</h2><div class="grid">'
+    +'<div><label>Phase</label>'+sel('stage',STAGES.map((x,i)=>[i,x.name]),PV.stage)+'</div>'
+    +'<div><label>Woche</label>'+sel('week',Array.from({length:STAGES[PV.stage].weeks},(_,i)=>[i+1,String(i+1)]),PV.week)+'</div>'
+    +'<div><label>Einheit</label>'+sel('day',ord(S).map((l,i)=>[i,(i+1)+'. '+NAME[l]]),PV.day)+'</div></div>'
+    +'<div class="mut" style="margin:8px 0">Mit aktuellem TM '+fmt(P.tm)+' kg. Spätere Phasen können nach einer TM-Anpassung abweichen.</div>';
+  h+='<b>Aufwärmen</b><div class="mut">'+P.warm.map(w=>fmt(w.w)+'×'+w.r).join(' · ')+'</div>';
+  h+='<b>'+(P.st.kind==='L'?"5's PRO":P.st.kind==='A'?'Hauptsätze (3/5/1)':'Deload / TM-Satz')+'</b><div class="mut">'+P.main.map(m=>fmt(m.w)+' kg × '+m.r+(m.pr?'+':'')).join(' · ')+'</div>';
+  if(P.extra)h+='<b>'+P.extra.name+'</b><div class="mut">'+P.extra.sets+' × '+P.extra.reps+' @ '+fmt(P.extra.w)+' kg ('+Math.round(P.extra.pct*100)+' %)</div>';
+  h+='<b>Assistenzübungen</b><div class="mut">'+P.acc.map(a=>a.name+' '+a.sets+'×'+(a.reps||'')).join('<br>')+'</div>'
+    +'<button class="btn sec" style="margin-top:10px" onclick="editFromPV()">Assistenzübungen dieses Tages bearbeiten</button>'
+    +'<button class="btn sec" onclick="setTab(\'einst\')">TM, BBB-% und Reihenfolge ändern</button></div>';
+  return h;
+}
 function viewPlan(){
-  let h='<div class="card"><h2>Trainingsmaxima</h2><table><tr><th>Lift</th><th>TM</th><th>1RM</th><th>Nächster Schritt</th></tr>';
+  let h=viewVorschau()+'<div class="card"><h2>Trainingsmaxima</h2><table><tr><th>Lift</th><th>TM</th><th>1RM</th><th>Nächster Schritt</th></tr>';
   LIFTS.forEach(l=>{
     let nxt='+'+fmt(S.cfg.step[l])+' kg';
     if(S.fails[l]>0)nxt='1× verfehlt – bei erneutem Fehlschlag −10 %';
