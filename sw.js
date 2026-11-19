@@ -1,4 +1,4 @@
-const CACHE='wendler-v6';
+const CACHE='wendler-v7';
 const CORE=['./','index.html','manifest.webmanifest','icon-192.png','icon-512.png','apple-touch-icon.png'];
 const OPT=['fig-sq.png','fig-bp.png','fig-dl.png','fig-oh.png'];
 self.addEventListener('install',e=>{
